@@ -8,7 +8,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -19,6 +21,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -29,9 +32,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int PICK_FROM_CAMERA = 0;
     private static final int PICK_FROM_ALBUM = 1;
     private static final int CROP_FROM_IMAGE = 2;
-    private static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 0;
-    private static final int MY_PERMISSIONS_REQUEST_WRITE_CONTACTS = 1;
-    private static final int MY_PERMISSIONS_REQUEST_CAMERA_CONTACTS = 2;
+    private static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 3;
+    private static final int MY_PERMISSIONS_REQUEST_WRITE_CONTACTS = 4;
+    private static final int MY_PERMISSIONS_REQUEST_CAMERA_CONTACTS = 5;
 
     private String TAG = "MainActivity";
 
@@ -100,6 +103,14 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "doTakePhotoAction() - storageDir.path(): " + photoFile.getPath());
         Log.d(TAG, "doTakePhotoAction(): " + mImageCaptureUri.getPath());
 
+        // API 24 이상 Uri에 대한 권한 처리
+        if (Build.VERSION.SDK_INT >= 24) {
+            this.grantUriPermission("com.android.camera", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            this.grantUriPermission("com.android.camera", Uri.parse(imageUri), Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            this.grantUriPermission("com.hardware.camera2", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            this.grantUriPermission("com.hardware.camera2", Uri.parse(imageUri), Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
+
         intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageCaptureUri);
         startActivityForResult(intent, PICK_FROM_CAMERA);
     }
@@ -123,11 +134,18 @@ public class MainActivity extends AppCompatActivity {
 
         switch (requestCode) {
             case PICK_FROM_ALBUM: {
+                // 갤러리에서 이미지 가져오기
                 mImageCaptureUri = data.getData();
+                if (Build.VERSION.SDK_INT >= 24) {
+                    this.grantUriPermission("com.android.camera", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    this.grantUriPermission("com.hardware.camera2", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
 
+                imageView.setImageURI(mImageCaptureUri);
+/*
                 Intent intent = new Intent("com.android.camera.action.CROP");
                 intent.setDataAndType(mImageCaptureUri, "image/*");
-                Log.d(TAG, "onActivityResult() - PICK_FROM_CAMERA: " + mImageCaptureUri.getPath());
+                Log.d(TAG, "onActivityResult() - PICK_FROM_ALBUM: " + mImageCaptureUri.getPath());
 
                 // CROP할 이미지를 200*200 크기로 저장
                 intent.putExtra("outputX", 200); // CROP한 이미지의 x축 크기
@@ -137,17 +155,24 @@ public class MainActivity extends AppCompatActivity {
                 intent.putExtra("scale", true);
                 intent.putExtra("return-data", true);
                 startActivityForResult(intent, CROP_FROM_IMAGE);
-
-                Log.d(TAG, "onActivityResult() - PICK_FROM_ALBUM: " + mImageCaptureUri.getPath());
+  */
                 break;
             }
 
             case PICK_FROM_CAMERA: {
-                // 이미지를 가져온 이후의 리사이즈할 이미지 크기를 결정합니다.
-                // 이후에 이미지 크롭 어플리케이션을 호출하게 됩니다.
+                // 사진 촬영 후 이미지 가져오기
                 try {
-                    Bitmap bitmap = BitmapFactory.decodeFile(imageUri);
+                    BitmapFactory.Options options = new BitmapFactory.Options();
 
+                    // 이미지를 이미지뷰의 크기에 맞게 줄이기
+                    options.inJustDecodeBounds = true;
+                    BitmapFactory.decodeFile(imageUri, options);
+                    options.inSampleSize = calculateInSampleSize(options, 200, 200);
+                    options.inJustDecodeBounds = false;
+
+                    Bitmap bitmap = BitmapFactory.decodeFile(imageUri, options);
+
+                    // 사진 각도 맞추기
                     ExifInterface exif = new ExifInterface(imageUri);
                     int exifOrientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
                     int exifDegree = exifOrientationToDegrees(exifOrientation);
@@ -157,22 +182,6 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
 
-
-                // imageView.setImageURI(mImageCaptureUri);
-                /*
-                Intent intent = new Intent("com.android.camera.action.CROP");
-                intent.setDataAndType(mImageCaptureUri, "image/*");
-                Log.d(TAG, "onActivityResult() - PICK_FROM_CAMERA: " + mImageCaptureUri.getPath());
-
-                // CROP할 이미지를 200*200 크기로 저장
-                intent.putExtra("outputX", 200); // CROP한 이미지의 x축 크기
-                intent.putExtra("outputY", 200); // CROP한 이미지의 y축 크기
-                intent.putExtra("aspectX", 1); // CROP 박스의 X축 비율
-                intent.putExtra("aspectY", 1); // CROP 박스의 Y축 비율
-                intent.putExtra("scale", true);
-                intent.putExtra("return-data", true);
-                startActivityForResult(intent, CROP_FROM_IMAGE);
-*/
                 break;
             }
 
@@ -203,6 +212,26 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image
+        int height = options.outHeight;
+        int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+            int halfHeight = height/ 2;
+            int halfwidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfwidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
     }
 
     public int exifOrientationToDegrees(int exifOrientation) {
@@ -269,5 +298,10 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
     }
 }
