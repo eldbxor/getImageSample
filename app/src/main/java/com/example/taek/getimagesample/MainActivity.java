@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int PICK_FROM_CAMERA = 0;
     private static final int PICK_FROM_ALBUM = 1;
     private static final int CROP_FROM_IMAGE = 2;
+    private static final int MY_PERMISSIONS_REQUEST_ALL = 6;
     private static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 3;
     private static final int MY_PERMISSIONS_REQUEST_WRITE_CONTACTS = 4;
     private static final int MY_PERMISSIONS_REQUEST_CAMERA_CONTACTS = 5;
@@ -51,20 +52,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 갤러리 사용 권한 체크
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            // 권한이 없을 경우
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, MY_PERMISSIONS_REQUEST_READ_CONTACTS);
-        }
-        // 쓰기 권한 체크
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            // 권한이 없을 경우
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, MY_PERMISSIONS_REQUEST_WRITE_CONTACTS);
-        }
-        // 카메라 권한 체크
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            // 권한이 없을 경우
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, MY_PERMISSIONS_REQUEST_CAMERA_CONTACTS);
+        // 갤러리, 쓰기, 카메라 권한 요청
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE , Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, MY_PERMISSIONS_REQUEST_ALL);
         }
 
         buttonPickFromCamera = (Button) findViewById(R.id.button_pick_from_camera);
@@ -96,19 +88,22 @@ public class MainActivity extends AppCompatActivity {
         String url = "tmp_" + String.valueOf(System.currentTimeMillis()) + ".jpg";
         File storageDir = new File(Environment.getExternalStorageDirectory() + "/Pictures", "imageSample");
         File photoFile = new File(storageDir, url);
-        // mImageCaptureUri = Uri.fromFile(new File(Environment.getExternalStorageDirectory(), url));
+
+        // 임시 파일 저장 경로의 디렉토리가 없을 경우 생성
+        if (!storageDir.exists()) {
+            storageDir.mkdirs();
+        }
         mImageCaptureUri = FileProvider.getUriForFile(this, "com.example.taek.getimagesample.provider", photoFile);
+
+        // 저장 위치를 기억
         imageUri = photoFile.getPath();
-        Log.d(TAG, "doTakePhotoAction() - storageDir.path(): " + storageDir.getPath());
-        Log.d(TAG, "doTakePhotoAction() - storageDir.path(): " + photoFile.getPath());
-        Log.d(TAG, "doTakePhotoAction(): " + mImageCaptureUri.getPath());
 
         // API 24 이상 Uri에 대한 권한 처리
         if (Build.VERSION.SDK_INT >= 24) {
-            this.grantUriPermission("com.android.camera", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             this.grantUriPermission("com.android.camera", Uri.parse(imageUri), Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            this.grantUriPermission("com.hardware.camera2", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            this.grantUriPermission("com.android.camera", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             this.grantUriPermission("com.hardware.camera2", Uri.parse(imageUri), Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            this.grantUriPermission("com.hardware.camera2", mImageCaptureUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         }
 
         intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageCaptureUri);
@@ -285,6 +280,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_ALL: {
+
+            }
             case MY_PERMISSIONS_REQUEST_READ_CONTACTS: {
 
                 break;
